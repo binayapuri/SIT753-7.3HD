@@ -1,31 +1,57 @@
+
 version: '3.8'
 services:
-
+  # Jenkins Server
   jenkins:
     image: jenkins/jenkins:lts
+    container_name: jenkins-server
+    user: root
     ports:
       - "8080:8080"
       - "50000:50000"
     volumes:
       - jenkins_home:/var/jenkins_home
-      # allow Jenkins to run Docker commands on the host:
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - JENKINS_OPTS=--argumentsRealm.passwd.admin=admin123 --argumentsRealm.roles.admin=admin
 
+
+  # SonarQube for Code Quality
   sonarqube:
     image: sonarqube:community
+    container_name: sonarqube-server
     ports:
       - "9000:9000"
     environment:
       - sonar.jdbc.username=sonar
       - sonar.jdbc.password=sonar
       - sonar.jdbc.url=jdbc:postgresql://db:5432/sonar
+    depends_on:
+      - db
 
+  # PostgreSQL for SonarQube
   db:
     image: postgres:13
+    container_name: postgres-db
     environment:
       - POSTGRES_USER=sonar
       - POSTGRES_PASSWORD=sonar
       - POSTGRES_DB=sonar
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Your App (for deployment testing)
+  expense-app:
+    build: .
+    container_name: expense-app
+    ports:
+      - "3000:8000"
+    environment:
+      - MONGO_URI=${MONGO_URI:-mongodb+srv://your-connection-string}
+    depends_on:
+      - jenkins
 
 volumes:
   jenkins_home:
+  postgres_data:
