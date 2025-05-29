@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Expenses To-Do</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <h1>My Expenses To-Do</h1>
+    </header>
+
+    <form id="form" class="expense-form">
+      <input name="title" class="input" placeholder="Title" required />
+      <input name="amount" class="input" type="number" placeholder="Amount" required />
+      <button class="btn">Add</button>
+    </form>
+
+    <ul id="list" class="expense-list">
+      <!-- dynamically injected items -->
+    </ul>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
