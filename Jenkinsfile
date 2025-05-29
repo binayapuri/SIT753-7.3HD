@@ -11,9 +11,8 @@ pipeline {
         EC2_HOST = '3.86.221.246'
         DOCKER_IMAGE = "expense-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        NOTIFICATION_EMAIL = "puri.binaya@gmail.com"
-        SLACK_WEBHOOK = credentials('https://hooks.slack.com/services/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')
-
+        // Add your email for notifications
+        NOTIFICATION_EMAIL = "your-email@example.com"
     }
     
     stages {
@@ -91,12 +90,14 @@ pipeline {
                                 echo 'Installing Git...'
                                 sudo yum update -y
                                 sudo yum install git -y
-                            else
-                                echo 'Git already installed'
                             fi
                             
-                            # Verify Git installation
-                            git --version
+                            # Install curl if not present
+                            if ! command -v curl &> /dev/null; then
+                                echo 'Installing curl...'
+                                sudo yum install curl -y
+                            fi
+                            
                             echo 'EC2 environment setup completed!'
                         "
                     '''
@@ -112,7 +113,7 @@ pipeline {
                 
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     sh '''
-                        # Save and transfer Docker image as backup
+                        # Save and transfer Docker image
                         docker save ${DOCKER_IMAGE}:${IMAGE_TAG} | gzip > expense-app-${IMAGE_TAG}.tar.gz
                         scp -i $SSH_KEY -o StrictHostKeyChecking=no expense-app-${IMAGE_TAG}.tar.gz $SSH_USER@${EC2_HOST}:/tmp/
                         
@@ -151,33 +152,23 @@ pipeline {
                             echo 'Waiting for application startup...'
                             sleep 25
                             
-                            echo 'Checking container status...'
-                            docker ps | grep expense-app-staging || echo 'Container not found'
-                            
-                            echo 'Checking application logs...'
-                            docker logs --tail 20 expense-app-staging || echo 'No logs available'
-                            
-                            echo 'Performing health checks...'
+                            # Health check with retry
                             HEALTH_CHECK_PASSED=false
-                            for i in {1..12}; do
-                                echo \"Health check attempt \$i of 12...\"
+                            for i in {1..10}; do
                                 if curl -f http://localhost:3000/ > /dev/null 2>&1; then
                                     echo '✅ Staging health check PASSED!'
                                     HEALTH_CHECK_PASSED=true
                                     break
                                 else
-                                    echo \"Attempt \$i failed, waiting 5 seconds...\"
-                                    sleep 5
+                                    echo \"Health check attempt \$i/10 failed, retrying...\"
+                                    sleep 6
                                 fi
                             done
                             
                             if [ \"\$HEALTH_CHECK_PASSED\" = false ]; then
-                                echo '⚠️ Health check failed after 12 attempts'
-                                echo 'Final container status:'
-                                docker ps -a | grep expense-app-staging
-                                echo 'Final logs:'
-                                docker logs --tail 30 expense-app-staging
-                                echo 'But container appears to be running, continuing...'
+                                echo '⚠️ Health check timeout, but container may still be starting'
+                                docker ps | grep expense-app-staging || echo 'Container not visible'
+                                docker logs --tail 20 expense-app-staging || echo 'No logs available'
                             fi
                         "
                     '''
@@ -212,26 +203,24 @@ pipeline {
                             echo 'Waiting for production startup...'
                             sleep 25
                             
-                            echo 'Production health check...'
+                            # Production health check
                             PROD_HEALTH_PASSED=false
-                            for i in {1..12}; do
-                                echo \"Production health check attempt \$i of 12...\"
+                            for i in {1..10}; do
                                 if curl -f http://localhost:8000/ > /dev/null 2>&1; then
                                     echo '✅ Production health check PASSED!'
                                     PROD_HEALTH_PASSED=true
                                     break
                                 else
-                                    echo \"Attempt \$i failed, waiting 5 seconds...\"
-                                    sleep 5
+                                    echo \"Production health check attempt \$i/10 failed, retrying...\"
+                                    sleep 6
                                 fi
                             done
                             
                             if [ \"\$PROD_HEALTH_PASSED\" = false ]; then
-                                echo '⚠️ Production health check timeout, but container is running'
+                                echo '⚠️ Production health check timeout'
+                                docker ps | grep expense-app-prod || echo 'Container not visible'
+                                docker logs --tail 20 expense-app-prod || echo 'No logs available'
                             fi
-                            
-                            echo 'Final production status:'
-                            docker ps | grep expense-app-prod || echo 'Production container not visible'
                         "
                     '''
                 }
@@ -255,8 +244,8 @@ pipeline {
                     withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                         sh """
                             ssh -i \$SSH_KEY -o StrictHostKeyChecking=no \$SSH_USER@${EC2_HOST} "
-                                docker tag expense-app:ec2-${BUILD_NUMBER} expense-app:${version} || echo 'Failed to tag version'
-                                docker tag expense-app:ec2-${BUILD_NUMBER} expense-app:latest || echo 'Failed to tag latest'
+                                docker tag expense-app:ec2-${BUILD_NUMBER} expense-app:${version}
+                                docker tag expense-app:ec2-${BUILD_NUMBER} expense-app:latest
                                 echo 'Release tagging completed'
                             "
                         """
@@ -269,9 +258,61 @@ pipeline {
             }
         }
         
-        stage('📊 Monitoring') {
+        stage('📊 Monitoring Setup') {
             steps {
-                echo '📊 Final monitoring and status check...'
+                echo '📊 Setting up monitoring...'
+                
+                withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
+                    sh '''
+                        ssh -i $SSH_KEY -o StrictHostKeyChecking=no $SSH_USER@${EC2_HOST} "
+                            echo 'Setting up monitoring scripts...'
+                            
+                            # Create monitoring directory
+                            mkdir -p ~/monitoring
+                            
+                            # Create health check script
+                            cat > ~/monitoring/health_check.sh << 'EOF'
+#!/bin/bash
+TIMESTAMP=\\$(date '+%Y-%m-%d %H:%M:%S')
+LOG_FILE=~/monitoring/health_check.log
+
+echo \"[\\$TIMESTAMP] Starting health check...\" >> \\$LOG_FILE
+
+# Check staging
+if curl -f http://localhost:3000/ > /dev/null 2>&1; then
+    echo \"[\\$TIMESTAMP] ✅ Staging: HEALTHY\" >> \\$LOG_FILE
+else
+    echo \"[\\$TIMESTAMP] ❌ Staging: UNHEALTHY\" >> \\$LOG_FILE
+fi
+
+# Check production
+if curl -f http://localhost:8000/ > /dev/null 2>&1; then
+    echo \"[\\$TIMESTAMP] ✅ Production: HEALTHY\" >> \\$LOG_FILE
+else
+    echo \"[\\$TIMESTAMP] ❌ Production: UNHEALTHY\" >> \\$LOG_FILE
+fi
+
+echo \"[\\$TIMESTAMP] Health check completed\" >> \\$LOG_FILE
+EOF
+                            
+                            chmod +x ~/monitoring/health_check.sh
+                            
+                            # Run initial health check
+                            ~/monitoring/health_check.sh
+                            
+                            echo 'Monitoring setup completed!'
+                            echo 'View logs with: tail -f ~/monitoring/health_check.log'
+                        "
+                    '''
+                }
+                
+                echo '✅ Monitoring configured!'
+            }
+        }
+        
+        stage('📈 Final Status Report') {
+            steps {
+                echo '📈 Generating final status report...'
                 
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     sh '''
@@ -303,54 +344,89 @@ pipeline {
                             echo '• Staging Environment: http://${EC2_HOST}:3000'
                             echo '• Production Environment: http://${EC2_HOST}:8000'
                             
-                            echo ''
-                            echo '📋 Container Logs (Last 5 lines):'
-                            echo 'Staging logs:'
-                            docker logs --tail 5 expense-app-staging 2>/dev/null || echo 'No staging logs available'
-                            echo 'Production logs:'
-                            docker logs --tail 5 expense-app-prod 2>/dev/null || echo 'No production logs available'
-                            
                             echo '=================================================='
                         "
                     '''
                 }
                 
-                echo '✅ Monitoring setup completed!'
+                echo '✅ Status report completed!'
             }
         }
     }
     
     post {
         always {
-            echo '🧹 Cleaning up...'
-            sh 'docker system prune -f || true'
-            sh 'rm -f expense-app-*.tar.gz || true'
+            script {
+                try {
+                    echo '🧹 Cleaning up...'
+                    sh 'docker system prune -f || true'
+                    sh 'rm -f expense-app-*.tar.gz || true'
+                } catch (Exception e) {
+                    echo "Cleanup failed: ${e.message}"
+                }
+            }
         }
         success {
-            echo ''
-            echo '🎉 =================================================='
-            echo '🎉           PIPELINE SUCCESS!'
-            echo '🎉 =================================================='
-            echo ''
-            echo '✅ All 8 stages completed successfully:'
-            echo '  1. ✅ Checkout: Code retrieved from GitHub'
-            echo '  2. ✅ Build: Docker images created'
-            echo '  3. ✅ Test: All automated tests passed'
-            echo '  4. ✅ Code Quality: SonarQube analysis completed'
-            echo '  5. ✅ Security: Vulnerabilities documented'
-            echo '  6. ✅ Setup: EC2 environment configured'
-            echo '  7. ✅ Deploy: Staging + Production deployed'
-            echo '  8. ✅ Release: Version tagged and released'
-            echo '  9. ✅ Monitoring: Health checks completed'
-            echo ''
-            echo '🌐 Your application is now live at:'
-            echo "  • Staging: http://${EC2_HOST}:3000"
-            echo "  • Production: http://${EC2_HOST}:8000"
-            echo ''
-            echo '🏆 COMPLETE CI/CD PIPELINE DEPLOYED TO AWS!'
+            script {
+                echo ''
+                echo '🎉 =================================================='
+                echo '🎉           PIPELINE SUCCESS!'
+                echo '🎉 =================================================='
+                echo ''
+                echo '✅ All stages completed successfully:'
+                echo '  1. ✅ Checkout: Code retrieved from GitHub'
+                echo '  2. ✅ Build: Docker images created'
+                echo '  3. ✅ Test: All automated tests passed'
+                echo '  4. ✅ Code Quality: SonarQube analysis completed'
+                echo '  5. ✅ Security: Vulnerabilities documented'
+                echo '  6. ✅ Setup: EC2 environment configured'
+                echo '  7. ✅ Deploy: Staging + Production deployed'
+                echo '  8. ✅ Release: Version tagged and released'
+                echo '  9. ✅ Monitoring: Health checks active'
+                echo ''
+                echo '🌐 Your application is now live at:'
+                echo "  • Staging: http://${EC2_HOST}:3000"
+                echo "  • Production: http://${EC2_HOST}:8000"
+                echo ''
+                echo '🏆 COMPLETE CI/CD PIPELINE SUCCESS!'
+                
+                // Create deployment summary
+                def deploymentSummary = """
+🎉 DEPLOYMENT SUCCESS!
+========================
+📅 Date: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
+🏷️ Version: v1.${BUILD_NUMBER}
+⏱️ Duration: ${currentBuild.durationString}
+
+🌐 URLs:
+• Staging: http://${EC2_HOST}:3000
+• Production: http://${EC2_HOST}:8000
+
+📊 Monitor: SSH to EC2 and run 'tail -f ~/monitoring/health_check.log'
+========================
+                """.trim()
+                
+                echo deploymentSummary
+            }
         }
         failure {
-            echo '❌ Pipeline failed! Check the logs above for details.'
+            script {
+                echo '❌ =================================================='
+                echo '❌           PIPELINE FAILED!'
+                echo '❌ =================================================='
+                echo ''
+                echo 'Please check the logs above for error details.'
+                echo 'Common issues:'
+                echo '• Network connectivity to EC2'
+                echo '• MongoDB Atlas connection'
+                echo '• Docker build failures'
+                echo '• Application startup issues'
+                echo ''
+                echo 'Debug commands:'
+                echo "• SSH to EC2: ssh -i your-key.pem ec2-user@${EC2_HOST}"
+                echo '• Check containers: docker ps -a'
+                echo '• Check logs: docker logs expense-app-staging'
+            }
         }
     }
 }
