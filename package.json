@@ -1,9 +1,10 @@
 {
   "name": "react_api_backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Expense tracking application with CI/CD pipeline",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "mocha tests/ --timeout 10000 --exit",
     "test:coverage": "nyc mocha tests/ --timeout 10000 --exit"
@@ -19,10 +20,13 @@
     "mysql": "^2.18.1"
   },
   "devDependencies": {
-    "chai": "^5.2.0",
-    "mocha": "^11.5.0",
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0",
     "nodemon": "^3.1.10",
-    "nyc": "^17.1.0",
-    "supertest": "^7.1.1"
+    "nyc": "^15.1.0",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
