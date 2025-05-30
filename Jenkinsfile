@@ -6,7 +6,7 @@ pipeline {
     }
     
     triggers {
-        pollSCM('H/2 * * * *')  // Poll GitHub every 2 minutes for changes
+        pollSCM('H/2 * * * *')
     }
     
     environment {
@@ -22,52 +22,52 @@ pipeline {
         stage('📋 Pipeline Start') {
             steps {
                 script {
-                    echo '🚀 Starting CI/CD Pipeline...'
-                    echo "📧 Build #${BUILD_NUMBER} started at ${new Date()}"
-                    echo "🔄 Triggered automatically by Git push"
-                    echo "📝 Commit: ${env.GIT_COMMIT ?: 'Latest'}"
-                    echo "🌿 Branch: ${env.GIT_BRANCH ?: 'main'}"
-                    echo '📧 Email notifications will be sent upon completion'
+                    echo ' Starting CI/CD Pipeline...'
+                    echo " Build #${BUILD_NUMBER} started at ${new Date()}"
+                    echo " Triggered automatically by Git push"
+                    echo " Commit: ${env.GIT_COMMIT ?: 'Latest'}"
+                    echo " Branch: ${env.GIT_BRANCH ?: 'main'}"
+                    echo ' Email notifications will be sent upon completion'
                 }
             }
         }
         
-        stage('📥 Checkout') {
+        stage(' Checkout') {
             steps {
-                echo '📥 Checking out code from GitHub...'
+                echo ' Checking out code from GitHub...'
                 checkout scm
                 sh 'ls -la'
-                echo '✅ Code checked out successfully!'
+                echo ' Code checked out successfully!'
             }
         }
         
-        stage('🏗️ Build') {
+        stage(' Build') {
             steps {
-                echo '🏗️ Building application...'
+                echo ' Building application...'
                 sh 'npm install'
                 sh 'docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} .'
                 sh 'docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_IMAGE}:latest'
-                echo '✅ Build completed successfully!'
+                echo ' Build completed successfully!'
             }
         }
         
-        stage('🧪 Test') {
+        stage(' Test') {
             steps {
-                echo '🧪 Running tests...'
+                echo ' Running tests...'
                 sh 'npm test'
-                echo '✅ Tests passed!'
+                echo ' Tests passed!'
             }
         }
         
-        stage('📊 Code Quality') {
+        stage(' Code Quality') {
             steps {
-                echo '📊 Running SonarQube analysis...'
+                echo ' Running SonarQube analysis...'
                 script {
                     try {
                         withSonarQubeEnv('SonarQube') {
                             sh 'npx sonar-scanner'
                         }
-                        echo '✅ Code quality analysis completed!'
+                        echo ' Code quality analysis completed!'
                     } catch (Exception e) {
                         echo '⚠️ SonarQube analysis failed, but continuing pipeline'
                         echo "Error: ${e.getMessage()}"
@@ -76,25 +76,25 @@ pipeline {
             }
         }
         
-        stage('🔒 Security Scan') {
+        stage(' Security Scan') {
             steps {
-                echo '🔒 Running security scan...'
+                echo ' Running security scan...'
                 script {
                     try {
                         sh 'npm audit --audit-level=high'
-                        echo '✅ No high-severity vulnerabilities found!'
+                        echo ' No high-severity vulnerabilities found!'
                     } catch (Exception e) {
                         echo '⚠️ Security vulnerabilities detected - documented for review'
                         sh 'npm audit --audit-level=high || true'
                     }
                 }
-                echo '✅ Security scan completed!'
+                echo ' Security scan completed!'
             }
         }
         
-        stage('🚀 Deploy to Staging') {
+        stage(' Deploy to Staging') {
             steps {
-                echo '🚀 Deploying to EC2 staging with direct build...'
+                echo ' Deploying to EC2 staging with direct build...'
                 
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     sh '''
@@ -160,14 +160,14 @@ pipeline {
                     '''
                 }
                 
-                echo '✅ Staging deployment completed!'
-                echo "🌐 Staging URL: http://${EC2_HOST}:3000"
+                echo ' Staging deployment completed!'
+                echo " Staging URL: http://${EC2_HOST}:3000"
             }
         }
         
-        stage('🌟 Deploy to Production') {  
+        stage(' Deploy to Production') {  
             steps {
-                echo '🌟 Deploying to production...'
+                echo ' Deploying to production...'
                 
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     sh '''
@@ -193,7 +193,7 @@ pipeline {
                             PROD_HEALTH_PASSED=false
                             for i in {1..10}; do
                                 if curl -f http://localhost:8000/ > /dev/null 2>&1; then
-                                    echo '✅ Production health check PASSED!'
+                                    echo ' Production health check PASSED!'
                                     PROD_HEALTH_PASSED=true
                                     break
                                 else
@@ -213,14 +213,14 @@ pipeline {
                     '''
                 }
                 
-                echo '✅ Production deployment successful!'
-                echo "🌟 Production URL: http://${EC2_HOST}:8000"
+                echo ' Production deployment successful!'
+                echo " Production URL: http://${EC2_HOST}:8000"
             }
         }
         
-        stage('🏷️ Release') {
+        stage(' Release') {
             steps {
-                echo '🏷️ Creating release...'
+                echo ' Creating release...'
                 
                 script {
                     def version = "v1.${BUILD_NUMBER}"
@@ -239,16 +239,16 @@ pipeline {
                         """
                     }
                     
-                    echo "✅ Tagged release as ${version}"
+                    echo " Tagged release as ${version}"
                 }
                 
-                echo '✅ Release created successfully!'
+                echo ' Release created successfully!'
             }
         }
         
-        stage('📊 Monitoring Setup') {
+        stage(' Monitoring Setup') {
             steps {
-                echo '📊 Setting up monitoring...'
+                echo ' Setting up monitoring...'
                 
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     sh '''
@@ -268,16 +268,16 @@ echo \"[\\$TIMESTAMP] Starting health check...\" >> \\$LOG_FILE
 
 # Check staging
 if curl -f http://localhost:3000/ > /dev/null 2>&1; then
-    echo \"[\\$TIMESTAMP] ✅ Staging: HEALTHY\" >> \\$LOG_FILE
+    echo \"[\\$TIMESTAMP]  Staging: HEALTHY\" >> \\$LOG_FILE
 else
-    echo \"[\\$TIMESTAMP] ❌ Staging: UNHEALTHY\" >> \\$LOG_FILE
+    echo \"[\\$TIMESTAMP]  Staging: UNHEALTHY\" >> \\$LOG_FILE
 fi
 
 # Check production
 if curl -f http://localhost:8000/ > /dev/null 2>&1; then
-    echo \"[\\$TIMESTAMP] ✅ Production: HEALTHY\" >> \\$LOG_FILE
+    echo \"[\\$TIMESTAMP]  Production: HEALTHY\" >> \\$LOG_FILE
 else
-    echo \"[\\$TIMESTAMP] ❌ Production: UNHEALTHY\" >> \\$LOG_FILE
+    echo \"[\\$TIMESTAMP]  Production: UNHEALTHY\" >> \\$LOG_FILE
 fi
 
 echo \"[\\$TIMESTAMP] Health check completed\" >> \\$LOG_FILE
@@ -294,45 +294,45 @@ EOF
                     '''
                 }
                 
-                echo '✅ Monitoring configured!'
+                echo ' Monitoring configured!'
             }
         }
         
-        stage('📈 Final Status Report') {
+        stage(' Final Status Report') {
             steps {
-                echo '📈 Generating final status report...'
+                echo ' Generating final status report...'
                 
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     sh '''
                         ssh -i $SSH_KEY -o StrictHostKeyChecking=no $SSH_USER@${EC2_HOST} "
                             echo ''
-                            echo '📊 AUTOMATIC DEPLOYMENT STATUS REPORT'
+                            echo ' AUTOMATIC DEPLOYMENT STATUS REPORT'
                             echo '=================================================='
                             
                             echo ''
-                            echo '🐳 Running Containers:'
+                            echo ' Running Containers:'
                             docker ps --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}' | grep expense-app || echo 'No expense-app containers visible'
                             
                             echo ''
-                            echo '🏥 Health Status:'
+                            echo ' Health Status:'
                             if curl -f http://localhost:3000/ > /dev/null 2>&1; then
-                                echo '✅ Staging (Port 3000): HEALTHY'
+                                echo ' Staging (Port 3000): HEALTHY'
                             else
-                                echo '❌ Staging (Port 3000): NOT RESPONDING'
+                                echo ' Staging (Port 3000): NOT RESPONDING'
                             fi
                             
                             if curl -f http://localhost:8000/ > /dev/null 2>&1; then
-                                echo '✅ Production (Port 8000): HEALTHY'
+                                echo ' Production (Port 8000): HEALTHY'
                             else
-                                echo '❌ Production (Port 8000): NOT RESPONDING'
+                                echo ' Production (Port 8000): NOT RESPONDING'
                             fi
                             
                             echo ''
-                            echo '💾 Disk Usage:'
+                            echo ' Disk Usage:'
                             df -h
                             
                             echo ''
-                            echo '🌐 Access URLs:'
+                            echo ' Access URLs:'
                             echo '• Staging Environment: http://${EC2_HOST}:3000'
                             echo '• Production Environment: http://${EC2_HOST}:8000'
                             
@@ -341,7 +341,7 @@ EOF
                     '''
                 }
                 
-                echo '✅ Status report completed!'
+                echo ' Status report completed!'
             }
         }
     }
@@ -350,7 +350,7 @@ EOF
         always {
             script {
                 try {
-                    echo '🧹 Cleaning up...'
+                    echo ' Cleaning up...'
                     sh 'docker system prune -f || true'
                     sh 'rm -f expense-app-*.tar.gz || true'
                 } catch (Exception e) {
@@ -361,11 +361,11 @@ EOF
         success {
             script {
                 echo ''
-                echo '🎉 =================================================='
-                echo '🎉      AUTOMATIC DEPLOYMENT SUCCESS!'
-                echo '🎉 =================================================='
+                echo ' =================================================='
+                echo '      AUTOMATIC DEPLOYMENT SUCCESS!'
+                echo ' =================================================='
                 echo ''
-                echo '✅ All stages completed successfully:'
+                echo ' All stages completed successfully:'
                 echo '  1. ✅ Checkout: Code retrieved from GitHub automatically'
                 echo '  2. ✅ Build: Docker images created'
                 echo '  3. ✅ Test: All automated tests passed'
@@ -375,19 +375,19 @@ EOF
                 echo '  7. ✅ Release: Version tagged and released'
                 echo '  8. ✅ Monitoring: Health checks active'
                 echo ''
-                echo '🌐 Your application is now live at:'
+                echo ' Your application is now live at:'
                 echo "  • Staging: http://${EC2_HOST}:3000"
                 echo "  • Production: http://${EC2_HOST}:8000"
                 echo ''
-                echo '🔄 AUTOMATIC DEPLOYMENT ACTIVE!'
+                echo ' AUTOMATIC DEPLOYMENT ACTIVE!'
                 echo 'Pipeline will trigger automatically every 2 minutes when changes are detected!'
                 
-                // 📧 EMAIL NOTIFICATION - Success
+                //  EMAIL NOTIFICATION - Success
                 try {
                     def deploymentSummary = """
-🎉 AUTOMATIC CI/CD DEPLOYMENT SUCCESS! 🎉
+ AUTOMATIC CI/CD DEPLOYMENT SUCCESS! 🎉
 ===========================================
-🔄 TRIGGERED AUTOMATICALLY BY GIT PUSH
+ TRIGGERED AUTOMATICALLY BY GIT PUSH
 
 Project: ${env.JOB_NAME}
 Build Number: #${env.BUILD_NUMBER}
@@ -395,12 +395,10 @@ Duration: ${currentBuild.durationString}
 Version: v1.${env.BUILD_NUMBER}
 Completed: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
 
-📝 GIT INFORMATION:
+ GIT INFORMATION:
 • Commit: ${env.GIT_COMMIT ?: 'Latest'}
 • Branch: ${env.GIT_BRANCH ?: 'main'}
-• Triggered: Automatically by Poll SCM (every 2 minutes)
 
-🌐 LIVE APPLICATION URLS:
 • Staging Environment: http://${EC2_HOST}:3000
 • Production Environment: http://${EC2_HOST}:8000
 
@@ -414,25 +412,6 @@ Completed: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
 • Release Tagging ✅ - Version v1.${env.BUILD_NUMBER} created automatically
 • Monitoring Setup ✅ - Health checks configured and active
 
-🏆 COMPLETE AUTOMATIC CI/CD SUCCESS!
-
-🔄 CONTINUOUS DEPLOYMENT ACTIVE:
-Your pipeline is now configured for automatic deployment!
-Every time you push code to GitHub, the following happens automatically:
-1. Jenkins polls GitHub every 2 minutes for changes
-2. When changes are detected, pipeline triggers automatically
-3. Code is built, tested, and deployed to both staging and production
-4. Email notifications are sent on success/failure
-5. Applications are updated with zero manual intervention
-
-📊 DEPLOYMENT DETAILS:
-• Deployment Method: Automatic via Poll SCM
-• Polling Frequency: Every 2 minutes
-• Build Method: Direct build on EC2 (no file transfer)
-• Architecture: AMD64 compatible
-• Container Runtime: Docker with auto-restart
-• Health Checks: Automated monitoring every 5 minutes
-• Disk Space: Optimized to prevent storage issues
 
 🔧 MONITORING & MAINTENANCE:
 • Health Logs: SSH to EC2 and run 'tail -f ~/monitoring/health_check.log'
@@ -441,24 +420,14 @@ Every time you push code to GitHub, the following happens automatically:
 • Disk Space: 'df -h' to monitor storage usage
 • Pipeline Status: Check Jenkins dashboard at http://localhost:8080
 
-🌍 ACCESS YOUR APPLICATION:
-Visit the URLs above to see your live expense tracking application!
-Changes you make to the code will automatically deploy within 2-4 minutes!
-
-📋 BUILD INFORMATION:
+BUILD INFORMATION:
 • Jenkins Build: ${env.BUILD_URL}
 • Console Log: ${env.BUILD_URL}console
 • Git Commit: ${env.GIT_COMMIT ?: 'Latest'}
 • Git Branch: ${env.GIT_BRANCH ?: 'main'}
 
-🎯 NEXT STEPS:
-1. Test your application at the staging URL
-2. Verify production deployment works correctly
-3. Make a code change and push to GitHub
-4. Watch Jenkins automatically detect and deploy changes!
-5. Your automatic CI/CD pipeline is now fully operational!
 
-🚀 CONGRATULATIONS ON YOUR AUTOMATIC DEVOPS PIPELINE!
+
 Every push to GitHub now triggers automatic testing and deployment! 🎉
                     """.trim()
                     
@@ -468,19 +437,19 @@ Every push to GitHub now triggers automatic testing and deployment! 🎉
                         body: deploymentSummary
                     )
                     
-                    echo '📧 Success email notification sent!'
+                    echo ' Success email notification sent!'
                     
                 } catch (Exception e) {
-                    echo "📧 Email notification failed: ${e.getMessage()}"
+                    echo "Email notification failed: ${e.getMessage()}"
                     echo "Check Jenkins email configuration in Manage Jenkins > Configure System"
                 }
             }
         }
         failure {
             script {
-                echo '❌ =================================================='
-                echo '❌      AUTOMATIC DEPLOYMENT FAILED!'
-                echo '❌ =================================================='
+                echo ' =================================================='
+                echo '      AUTOMATIC DEPLOYMENT FAILED!'
+                echo ' =================================================='
                 echo ''
                 echo 'Please check the logs above for error details.'
                 echo 'Common issues:'
@@ -497,12 +466,12 @@ Every push to GitHub now triggers automatic testing and deployment! 🎉
                 echo '• Check disk space: df -h'
                 echo '• Clean tmp: sudo rm -rf /tmp/*'
                 
-                // 📧 EMAIL NOTIFICATION - Failure
+                // EMAIL NOTIFICATION - Failure
                 try {
                     def failureDetails = """
-❌ AUTOMATIC CI/CD DEPLOYMENT FAILED! ❌
+AUTOMATIC CI/CD DEPLOYMENT FAILED!
 =======================================
-🔄 TRIGGERED AUTOMATICALLY BY GIT PUSH
+ TRIGGERED AUTOMATICALLY BY GIT PUSH
 
 Project: ${env.JOB_NAME}
 Build Number: #${env.BUILD_NUMBER}
@@ -510,16 +479,16 @@ Failed Stage: ${env.STAGE_NAME ?: 'Unknown'}
 Duration: ${currentBuild.durationString}
 Failed At: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
 
-📝 GIT INFORMATION:
+ GIT INFORMATION:
 • Commit: ${env.GIT_COMMIT ?: 'Latest'}
 • Branch: ${env.GIT_BRANCH ?: 'main'}
 • Triggered: Automatically by Poll SCM
 
-🔍 FAILURE DETAILS:
+ FAILURE DETAILS:
 The automatic CI/CD pipeline encountered an error and could not complete successfully.
 Please review the build logs and take corrective action.
 
-📋 COMMON ISSUES & SOLUTIONS:
+COMMON ISSUES & SOLUTIONS:
 • EC2 Disk Space: Check /tmp directory usage with 'df -h'
   Solution: SSH to EC2 and run 'sudo rm -rf /tmp/*'
 
@@ -544,7 +513,7 @@ Please review the build logs and take corrective action.
 • Clean tmp directory: sudo rm -rf /tmp/*
 • Clean Docker: docker system prune -a -f
 
-📊 BUILD INFORMATION:
+BUILD INFORMATION:
 • Jenkins Build: ${env.BUILD_URL}
 • Console Output: ${env.BUILD_URL}console
 • Error Logs: Check the console output for detailed error messages
@@ -553,16 +522,12 @@ Please review the build logs and take corrective action.
 Please investigate the failure and fix the underlying issue.
 The automatic deployment will resume once the issue is resolved and you push a fix to GitHub.
 
-🔄 AUTOMATIC DEPLOYMENT STATUS:
+ AUTOMATIC DEPLOYMENT STATUS:
 • Polling Status: Still active (checking for changes every 2 minutes)
 • Next Check: Jenkins will continue checking for new commits
 • Recovery: Push a fix to GitHub and the pipeline will automatically retry
 
-🆘 NEED HELP?
-• Review Jenkins console logs for detailed error messages
-• Check EC2 instance status and connectivity
-• Verify all credentials and configurations are correct
-• Test individual components (MongoDB, Docker, etc.) separately
+
 
 Your automatic deployment will resume working once the issue is fixed! 🔧
                     """.trim()
