@@ -1000,7 +1000,7 @@ pipeline {
     agent any
     
     tools {
-        nodejs 'NodeJS-16'
+        nodejs 'NodeJS-18'
     }
     
     environment {
