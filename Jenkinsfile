@@ -432,7 +432,6 @@
 // }
 
 
-
 pipeline {
     agent any
     
@@ -446,17 +445,17 @@ pipeline {
         EC2_HOST = '3.86.221.246'
         DOCKER_IMAGE = "expense-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        // Add your email for notifications
-        NOTIFICATION_EMAIL = "your-email@example.com"
-        // Slack channel for notifications
-        SLACK_CHANNEL = "#general"  // Change to your preferred channel
+        NOTIFICATION_EMAIL = "puri.binaya@gmail.com"  
+        SLACK_CHANNEL = "#all-deploy-notification"  
     }
     
     stages {
         stage('📋 Pipeline Start') {
             steps {
                 script {
-                    // Send Slack notification - Pipeline started
+                    echo '🚀 Starting CI/CD Pipeline...'
+                    
+                    // 🔔 SLACK NOTIFICATION - Pipeline Started
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'good',
@@ -469,8 +468,9 @@ pipeline {
 • *Time:* ${new Date().format('yyyy-MM-dd HH:mm:ss')}
                         """.trim()
                     )
+                    
+                    echo '📧 Email notification will be sent at completion'
                 }
-                echo '📋 Pipeline started - Slack notification sent'
             }
         }
         
@@ -481,11 +481,37 @@ pipeline {
                 sh 'ls -la'
                 echo '✅ Code checked out successfully!'
             }
+            post {
+                success {
+                    // 🔔 SLACK NOTIFICATION - Checkout Success
+                    slackSend(
+                        channel: "${SLACK_CHANNEL}",
+                        color: 'good',
+                        message: "✅ *Code Checkout Successful* - Latest code retrieved from GitHub! 📥"
+                    )
+                }
+                failure {
+                    // 🔔 SLACK NOTIFICATION - Checkout Failed
+                    slackSend(
+                        channel: "${SLACK_CHANNEL}",
+                        color: 'danger',
+                        message: "❌ *Code Checkout Failed* - Cannot retrieve code from GitHub!"
+                    )
+                }
+            }
         }
         
         stage('🏗️ Build') {
             steps {
                 echo '🏗️ Building application...'
+                
+                // 🔔 SLACK NOTIFICATION - Build Starting
+                slackSend(
+                    channel: "${SLACK_CHANNEL}",
+                    color: '#439FE0',
+                    message: "🏗️ *Build Stage Started* - Installing dependencies and building Docker image..."
+                )
+                
                 sh 'npm install'
                 sh 'docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} .'
                 sh 'docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_IMAGE}:latest'
@@ -493,6 +519,7 @@ pipeline {
             }
             post {
                 success {
+                    // 🔔 SLACK NOTIFICATION - Build Success
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'good',
@@ -500,6 +527,7 @@ pipeline {
                     )
                 }
                 failure {
+                    // 🔔 SLACK NOTIFICATION - Build Failed
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'danger',
@@ -512,11 +540,20 @@ pipeline {
         stage('🧪 Test') {
             steps {
                 echo '🧪 Running tests...'
+                
+                // 🔔 SLACK NOTIFICATION - Testing Starting
+                slackSend(
+                    channel: "${SLACK_CHANNEL}",
+                    color: '#439FE0',
+                    message: "🧪 *Testing Stage Started* - Running automated tests..."
+                )
+                
                 sh 'npm test'
                 echo '✅ Tests passed!'
             }
             post {
                 success {
+                    // 🔔 SLACK NOTIFICATION - Tests Passed
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'good',
@@ -524,6 +561,7 @@ pipeline {
                     )
                 }
                 failure {
+                    // 🔔 SLACK NOTIFICATION - Tests Failed
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'danger',
@@ -536,6 +574,14 @@ pipeline {
         stage('📊 Code Quality') {
             steps {
                 echo '📊 Running SonarQube analysis...'
+                
+                // 🔔 SLACK NOTIFICATION - Code Quality Starting
+                slackSend(
+                    channel: "${SLACK_CHANNEL}",
+                    color: '#439FE0',
+                    message: "📊 *Code Quality Analysis Started* - Running SonarQube scan..."
+                )
+                
                 script {
                     try {
                         withSonarQubeEnv('SonarQube') {
@@ -543,6 +589,7 @@ pipeline {
                         }
                         echo '✅ Code quality analysis completed!'
                         
+                        // 🔔 SLACK NOTIFICATION - Code Quality Success
                         slackSend(
                             channel: "${SLACK_CHANNEL}",
                             color: 'good',
@@ -552,6 +599,7 @@ pipeline {
                         echo '⚠️ SonarQube analysis failed, but continuing pipeline'
                         echo "Error: ${e.getMessage()}"
                         
+                        // 🔔 SLACK NOTIFICATION - Code Quality Warning
                         slackSend(
                             channel: "${SLACK_CHANNEL}",
                             color: 'warning',
@@ -565,11 +613,20 @@ pipeline {
         stage('🔒 Security Scan') {
             steps {
                 echo '🔒 Running security scan...'
+                
+                // 🔔 SLACK NOTIFICATION - Security Scan Starting
+                slackSend(
+                    channel: "${SLACK_CHANNEL}",
+                    color: '#439FE0',
+                    message: "🔒 *Security Scan Started* - Checking for vulnerabilities..."
+                )
+                
                 script {
                     try {
                         sh 'npm audit --audit-level=high'
                         echo '✅ No high-severity vulnerabilities found!'
                         
+                        // 🔔 SLACK NOTIFICATION - Security Scan Passed
                         slackSend(
                             channel: "${SLACK_CHANNEL}",
                             color: 'good',
@@ -579,6 +636,7 @@ pipeline {
                         echo '⚠️ Security vulnerabilities detected - documented for review'
                         sh 'npm audit --audit-level=high || true'
                         
+                        // 🔔 SLACK NOTIFICATION - Security Vulnerabilities
                         slackSend(
                             channel: "${SLACK_CHANNEL}",
                             color: 'warning',
@@ -593,6 +651,13 @@ pipeline {
         stage('🛠️ Setup EC2 Environment') {
             steps {
                 echo '🛠️ Setting up EC2 environment...'
+                
+                // 🔔 SLACK NOTIFICATION - EC2 Setup Starting
+                slackSend(
+                    channel: "${SLACK_CHANNEL}",
+                    color: '#439FE0',  
+                    message: "🛠️ *EC2 Setup Started* - Preparing cloud environment..."
+                )
                 
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     sh '''
@@ -619,10 +684,11 @@ pipeline {
                 
                 echo '✅ EC2 environment ready!'
                 
+                // 🔔 SLACK NOTIFICATION - EC2 Setup Complete
                 slackSend(
                     channel: "${SLACK_CHANNEL}",
                     color: 'good',
-                    message: "🛠️ *EC2 Setup Complete* - Environment ready for deployment!"
+                    message: "🛠️ *EC2 Setup Complete* - Cloud environment ready for deployment!"
                 )
             }
         }
@@ -631,6 +697,7 @@ pipeline {
             steps {
                 echo '🚀 Deploying to EC2 staging...'
                 
+                // 🔔 SLACK NOTIFICATION - Staging Deployment Starting
                 slackSend(
                     channel: "${SLACK_CHANNEL}",
                     color: '#439FE0',
@@ -705,6 +772,7 @@ pipeline {
             }
             post {
                 success {
+                    // 🔔 SLACK NOTIFICATION - Staging Success
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'good',
@@ -716,6 +784,7 @@ pipeline {
                     )
                 }
                 failure {
+                    // 🔔 SLACK NOTIFICATION - Staging Failed
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'danger',
@@ -729,6 +798,7 @@ pipeline {
             steps {
                 echo '🌟 Deploying to production...'
                 
+                // 🔔 SLACK NOTIFICATION - Production Deployment Starting
                 slackSend(
                     channel: "${SLACK_CHANNEL}",
                     color: '#439FE0',
@@ -782,6 +852,7 @@ pipeline {
             }
             post {
                 success {
+                    // 🔔 SLACK NOTIFICATION - Production Success
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'good',
@@ -793,6 +864,7 @@ pipeline {
                     )
                 }
                 failure {
+                    // 🔔 SLACK NOTIFICATION - Production Failed
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'danger',
@@ -808,6 +880,13 @@ pipeline {
                 
                 script {
                     def version = "v1.${BUILD_NUMBER}"
+                    
+                    // 🔔 SLACK NOTIFICATION - Release Starting
+                    slackSend(
+                        channel: "${SLACK_CHANNEL}",
+                        color: '#439FE0',
+                        message: "🏷️ *Creating Release* - Tagging version ${version}..."
+                    )
                     
                     // Tag local images
                     sh "docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_IMAGE}:${version}"
@@ -825,10 +904,11 @@ pipeline {
                     
                     echo "✅ Tagged release as ${version}"
                     
+                    // 🔔 SLACK NOTIFICATION - Release Complete
                     slackSend(
                         channel: "${SLACK_CHANNEL}",
                         color: 'good',
-                        message: "🏷️ *Release Created* - Version: ${version}"
+                        message: "🏷️ *Release Created Successfully* - Version: ${version}"
                     )
                 }
                 
@@ -839,6 +919,13 @@ pipeline {
         stage('📊 Monitoring Setup') {
             steps {
                 echo '📊 Setting up monitoring...'
+                
+                // 🔔 SLACK NOTIFICATION - Monitoring Starting
+                slackSend(
+                    channel: "${SLACK_CHANNEL}",
+                    color: '#439FE0',
+                    message: "📊 *Setting Up Monitoring* - Configuring health checks..."
+                )
                 
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     sh '''
@@ -886,10 +973,11 @@ EOF
                 
                 echo '✅ Monitoring configured!'
                 
+                // 🔔 SLACK NOTIFICATION - Monitoring Complete
                 slackSend(
                     channel: "${SLACK_CHANNEL}",
                     color: 'good',
-                    message: "📊 *Monitoring Setup Complete* - Health checks active!"
+                    message: "📊 *Monitoring Setup Complete* - Health checks are now active!"
                 )
             }
         }
@@ -974,7 +1062,7 @@ EOF
                 echo ''
                 echo '🏆 COMPLETE CI/CD PIPELINE SUCCESS!'
                 
-                // Send comprehensive success notification to Slack
+                // 🔔 SLACK NOTIFICATION - FINAL SUCCESS
                 slackSend(
                     channel: "${SLACK_CHANNEL}",
                     color: 'good',
@@ -1004,23 +1092,49 @@ EOF
                     """.trim()
                 )
                 
-                // Create deployment summary
-                def deploymentSummary = """
-🎉 DEPLOYMENT SUCCESS!
+                // 📧 EMAIL NOTIFICATION - Success
+                try {
+                    def deploymentSummary = """
+🎉 PIPELINE SUCCESS! 🎉
 ========================
-📅 Date: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
-🏷️ Version: v1.${BUILD_NUMBER}
-⏱️ Duration: ${currentBuild.durationString}
+Project: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Duration: ${currentBuild.durationString}
+Version: v1.${BUILD_NUMBER}
+Completed: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
 
-🌐 URLs:
+🌐 Live URLs:
 • Staging: http://${EC2_HOST}:3000
 • Production: http://${EC2_HOST}:8000
 
-📊 Monitor: SSH to EC2 and run 'tail -f ~/monitoring/health_check.log'
-========================
-                """.trim()
-                
-                echo deploymentSummary
+✅ Completed Stages:
+• Code Checkout ✅
+• Docker Build ✅  
+• Automated Tests ✅
+• Code Quality Analysis ✅
+• Security Scanning ✅
+• EC2 Deployment ✅
+• Release Tagging ✅
+• Monitoring Setup ✅
+
+🏆 Complete CI/CD Success!
+
+Debug Info:
+• Jenkins Build: ${env.BUILD_URL}
+• Console Log: ${env.BUILD_URL}console
+                    """.trim()
+                    
+                    mail(
+                        to: "${NOTIFICATION_EMAIL}",
+                        subject: "✅ SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                        body: deploymentSummary
+                    )
+                    
+                    echo '📧 Success email notification sent!'
+                    
+                } catch (Exception e) {
+                    echo "📧 Email notification failed: ${e.getMessage()}"
+                }
             }
         }
         failure {
@@ -1041,7 +1155,7 @@ EOF
                 echo '• Check containers: docker ps -a'
                 echo '• Check logs: docker logs expense-app-staging'
                 
-                // Send failure notification to Slack
+                // 🔔 SLACK NOTIFICATION - FAILURE
                 slackSend(
                     channel: "${SLACK_CHANNEL}",
                     color: 'danger',
@@ -1062,6 +1176,41 @@ EOF
 ⚠️ *Immediate attention required!*
                     """.trim()
                 )
+                
+                // 📧 EMAIL NOTIFICATION - Failure
+                try {
+                    def failureDetails = """
+❌ PIPELINE FAILED! ❌
+========================
+Project: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Failed Stage: ${env.STAGE_NAME ?: 'Unknown'}
+Duration: ${currentBuild.durationString}
+Failed at: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
+
+🔍 Debug Steps:
+• Check build logs in Jenkins: ${env.BUILD_URL}console
+• Verify EC2 connectivity
+• Check MongoDB Atlas connection
+• Review Docker container status
+
+⚠️ Immediate attention required!
+
+Jenkins Build: ${env.BUILD_URL}
+Console Output: ${env.BUILD_URL}console
+                    """.trim()
+                    
+                    mail(
+                        to: "${NOTIFICATION_EMAIL}",
+                        subject: "❌ FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                        body: failureDetails
+                    )
+                    
+                    echo '📧 Failure email notification sent!'
+                    
+                } catch (Exception e) {
+                    echo "📧 Email notification failed: ${e.getMessage()}"
+                }
             }
         }
     }
